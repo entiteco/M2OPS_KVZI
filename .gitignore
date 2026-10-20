@@ -1,5 +1,6 @@
 # Environnements virtuels Python
 venv/
+.venv/
 .env/
 __pycache__/
 *.pyc
@@ -16,3 +17,6 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+# macOS
+.DS_Store
