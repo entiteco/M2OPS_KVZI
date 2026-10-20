@@ -1,4 +1,3 @@
-
 # TD 1 : Cadrage et Bornage - Projet La Gazette
 
 ## 1. Note de cadrage (`cadrage.md`)
@@ -14,8 +13,8 @@ Mettre en œuvre un pipeline de données automatisé capable de lire quotidienne
 
 ### Contraintes
 
-- **Techniques & Opérationnelles :** SLA de livraison à 7h00 (heure locale). Fraîcheur des données : traitement des articles publiés dans les 24h précédentes.
-- **Financières :** Budget alloué de 0€ (utilisation des ressources locales au départ, puis de l'infra fournie).
+- **Techniques & Opérationnelles :** Livraison à 7h00 (heure locale). Fraîcheur des données : traitement des articles publiés dans les 24h précédentes.
+- **Financières :** Budget alloué de 0€ (utilisation des ressources locales au départ, puis de l'infra fournie, à confirmer car on a un VPS).
 - **Éthiques :** Respect strict des conditions d'utilisation des éditeurs de presse.
 
 ### Stack Technologique Retenue
@@ -23,9 +22,9 @@ Mettre en œuvre un pipeline de données automatisé capable de lire quotidienne
 *Suite à notre veille technique, la stack a été affinée pour correspondre à nos choix architecturaux :*
 
 - **Collecte & Traitement :** Python (Robuste, standard data/ML) ciblant les flux RSS.
-- **Ordonnancement (CI/CD) :** Orchestrateur Data (type Prefect, Dagster ou Airflow) pour la gestion avancée des graphes de dépendances et des reprises sur erreur.
-- **Stockage :** Base de données relationnelle unique (PostgreSQL) gérant à la fois les données brutes (via le type `JSONB`) et les données propres et transformées.
-- **Machine Learning :** NLP classique avec TF-IDF et K-Means (frugal, exécutable sur CPU, sans coût d'API).
+- **Ordonnancement (CI/CD) :** Orchestrateur Data (Airflow) pour la gestion avancée des graphes de dépendances et des reprises sur erreur.
+- **Stockage :** Architecture médaillon hybride combinant un Object Storage (ex: MinIO ou stockage de fichiers local) pour la zone Bronze (données brutes immuables) et PostgreSQL pour les zones Silver (données propres) et Gold (thèmes générés).
+- **Machine Learning :** Modélisation thématique sémantique avec BERTopic (embeddings légers `all-MiniLM-L6-v2` + UMAP/HDBSCAN, exécutable sur CPU sans dépendance ni coût d'API).
 - **Supervision :** Prometheus & Grafana (Standard de facto, intégration Docker optimale, alertes).
 - **Infrastructure :** Terraform (IaC pour le provisionnement) & Docker / Docker Compose (socle applicatif).
 
@@ -50,24 +49,26 @@ Dans le cadre du cadrage de La Gazette, nous avons évalué deux options pour ch
 
 ### 2.2. Faire tourner chaque matin
 
-* **Notre choix : Orchestrateur Data type Airflow / Prefect / Dagster (Option B)**
-  * *Pourquoi ce choix :* Un pipeline de données de production ne tolère pas les échecs silencieux. Un orchestrateur nous offre une vue claire sous forme de graphe (DAG), gère nativement les reprises sur erreur (*retries*), l'ordre des dépendances, et nous prévient si la gazette n'est pas prête avant 7h.
+* **Notre choix : Orchestrateur Data type Airflow (Option B)**
+  * *Pourquoi ce choix :* Un orchestrateur nous offre une vue claire sous forme de graphe (DAG), gère nativement les reprises sur erreur (*retries*), l'ordre des dépendances, et nous prévient si la gazette n'est pas prête avant 7h.
 * **Alternative écartée : Script Bash automatisé via un simple Cron (Option A)**
   * *Pourquoi on l'écarte :* Un Cron classique manque cruellement d'observabilité. S'il échoue à 5h du matin à cause d'une coupure réseau, la tâche "meurt" sans repêchage, et le débogage à posteriori nécessite d'aller fouiller manuellement dans des logs textuels non structurés.
 
 ### 2.3. Stocker
 
-* **Notre choix : Base de données relationnelle unique - PostgreSQL (Option A)**
-  * *Pourquoi ce choix :* Pour notre volume de métadonnées (titres, dates, résumés), une base de données relationnelle moderne comme PostgreSQL est amplement suffisante. Elle gère d'ailleurs parfaitement les données semi-structurées grâce à son type `JSONB` pour stocker le brut, tout en assurant l'intégrité du stockage propre (dédoublonnage via contraintes SQL).
+* **Notre choix : Architecture Médaillon hybride (Bronze en Object Storage local, Silver & Gold sur PostgreSQL) (Option A)**
+  * *Pourquoi ce choix :* Cette approche garantit l'immutabilité de nos données brutes tout en structurant l'analytique. Stocker le brut hors d'une base relationnelle évite d'alourdir Postgres avec de gros blobs JSON non indexables pertinemment, tout en gardant une trace exacte de ce qui a été ingéré en cas de besoin de retraitement (re-play).
+  * *Comment lier le Bronze au Silver :* Lors du run matinal, le script de collecte dépose les flux RSS bruts (JSON/XML) dans le stockage objet (ex: MinIO local ou un simple volume de fichiers `data/bronze/` pour démarrer). Le script de nettoyage (Silver) vient ensuite lire ces fichiers, parse les métadonnées utiles (titre, lien, date, extrait), filtre les doublons, et insère les lignes propres dans PostgreSQL. Pour assurer la traçabilité (lineage), chaque ligne dans la table Silver inclut une colonne `source_file_uri` pointant vers le fichier d'origine dans la zone Bronze.
 * **Alternative écartée : Data Lake + Data Warehouse séparés (Option B)**
-  * *Pourquoi on l'écarte :* La mise en place d'un stockage objet (S3) couplé à un entrepôt de données introduirait une complexité architecturale disproportionnée (*over-engineering*) par rapport à nos besoins actuels et augmenterait la surface de maintenance sans gain direct de performance pour du simple texte.
+  * *Pourquoi on l'écarte :* Insérer les flux RSS bruts directement dans une colonne `JSONB` de Postgres mélange la zone de *landing* (donnée sale) avec la zone de requêtage, ce qui complexifie la maintenance et fait grossir la base inutilement, allant à l'encontre des bonnes pratiques Data Engineering modernes.
 
 ### 2.4. Regrouper des textes
 
-* **Notre choix : Machine Learning classique - TF-IDF + K-Means (Option A)**
-  * *Pourquoi ce choix :* Cette approche traditionnelle de traitement du langage naturel (NLP) est extrêmement rapide, frugale en ressources (tourne sur un simple CPU) et répond parfaitement à notre contrainte de budget zéro. Elle suffit largement pour calculer des similarités lexicales et regrouper les articles parlant du même sujet du jour.
-* **Alternative écartée : Modèles de Langage (LLM) via API ou Embeddings lourds (Option B)**
-  * *Pourquoi on l'écarte :* Appeler une API externe (type OpenAI) enfreindrait notre contrainte de budget zéro et créerait une dépendance externe bloquante. Héberger de gros modèles d'embeddings (Sentence-Transformers) en local exigerait des ressources matérielles (RAM/GPU) dont nous ne disposons pas au démarrage du projet.
+* **Notre choix : Modélisation thématique avec BERTopic (Machine Learning sémantique) (Option A)**
+  * *Pourquoi ce choix :* Contrairement au TF-IDF qui repose sur la fréquence exacte des mots, BERTopic comprend la sémantique et les synonymes (ex: "tempête" et "ouragan" seront rapprochés). C'est le parfait compromis : il génère des thèmes hautement lisibles et pertinents tout en restant  *open-source* . En utilisant un modèle d'embedding très léger (comme `all-MiniLM-L6-v2`), il tourne parfaitement sur un CPU classique, respectant ainsi notre contrainte de budget zéro.
+  * *Comment on le met en œuvre :* Le pipeline récupère les extraits d'articles depuis la table Silver. BERTopic convertit ces textes en vecteurs (embeddings), réduit leur dimension (avec UMAP), puis les regroupe en clusters denses (avec HDBSCAN). Les thèmes générés (ID du cluster et mots-clés représentatifs) sont ensuite poussés dans la table Gold de PostgreSQL, prêts à être affichés dans la gazette de 7h.
+* **Alternative écartée : Modèles de Langage (LLM) via API (ex: OpenAI) ou TF-IDF basique (Option B)**
+  * *Pourquoi on l'écarte :* Un LLM via API coûte de l'argent (hors budget) et introduit une dépendance externe interdisant le fonctionnement en circuit fermé. À l'inverse, le TF-IDF + K-Means, bien que frugal, produit des clusters de trop faible qualité pour du texte de presse, rendant la gazette finale brouillonne et peu utile à la lecture.
 
 ### 2.5. Surveiller
 
@@ -85,47 +86,30 @@ Dans le cadre du cadrage de La Gazette, nous avons évalué deux options pour ch
 
 ---
 
-## 3. Dictionnaire des sources (`sources.csv`)
-
-| nom             | type | region                              | acces   | conditions                                      | notes                           |
-| :-------------- | :--- | :---------------------------------- | :------ | :---------------------------------------------- | :------------------------------ |
-| Ouest-France    | PQR  | Bretagne/Normandie/Pays de la Loire | URL RSS | Pas de scraping intégral, usage non commercial | Fréquence de MàJ élevée     |
-| La Voix du Nord | PQR  | Hauts-de-France                     | URL RSS | Usage informatif court                          | Sections par villes disponibles |
-| Sud Ouest       | PQR  | Nouvelle-Aquitaine                  | URL RSS | Maintien du lien hypertexte original            | -                               |
-| Le Télégramme | PQR  | Bretagne                            | URL RSS | Extraits uniquement                             | -                               |
-| Le Monde        | PQN  | National                            | URL RSS | Pas d'archivage massif abusif                   | Flux très riche et structuré  |
-| Libération     | PQN  | National                            | URL RSS | Citation de la source obligatoire               | -                               |
-| Le Figaro       | PQN  | National                            | URL RSS | Respect des balises XML                         | -                               |
-| Les Échos      | PQN  | National                            | URL RSS | Ne pas contourner le paywall                    | Orienté économie/business     |
-
-*(Note : Fichier à générer au format `.csv` à la racine ou dans le dossier `data/` du dépôt de l'équipe).*
-
----
-
-## 4. Architecture Cible (Mermaid)
+## 3. Architecture Cible (Mermaid)
 
 ```mermaid
 graph TD
     subgraph 1. Collecte
-        A[Presse PQR/PQN] -->|Flux RSS| B(Orchestrateur: Ingestion Python)
+        A[Presse PQR/PQN] -->|Flux RSS| B(Airflow : Ingestion Python)
     end
 
     subgraph 2. Stockage Brut
-        B -->|JSON/XML| C[(PostgreSQL - Brut JSONB)]
+        B -->|JSON/XML immuable| C[(MinIO / Object Storage - Zone Bronze)]
     end
 
     subgraph 3. Nettoyage & Qualité
-        C --> D(Orchestrateur: Script Transformation)
-        D -->|Dédoublonnage / Filtres| E[(PostgreSQL - Clean Data)]
+        C --> D(Airflow : Script Transformation)
+        D -->|Dédoublonnage / Filtres| E[(PostgreSQL - Zone Silver)]
     end
 
     subgraph 4. Regroupement par Thèmes
-        E --> F(Orchestrateur: Modèle TF-IDF + K-Means)
-        F -->|Similarités & Thèmes| G[(PostgreSQL - Thèmes)]
+        E --> F(Airflow : Modèle BERTopic)
+        F -->|Embeddings & Clusters| G[(PostgreSQL - Zone Gold)]
     end
 
     subgraph 5. Livraison
-        G --> H(Génération Edition 7H)
+        G --> H(Airflow : Génération Édition 7H)
         H -->|Export JSON/Markdown| I[Publication / Archivage]
     end
 
@@ -135,9 +119,10 @@ graph TD
         F -.-> J
         H -.-> J
         J --> K[Grafana - Dashboards & Alertes]
-  
+      
         L[Terraform] -.->|Provisionne| B
         L -.->|Provisionne| C
+        L -.->|Provisionne| E
         L -.->|Provisionne| J
     end
 ```
