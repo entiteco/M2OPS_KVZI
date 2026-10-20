@@ -11,7 +11,7 @@ def items_humanite():
 
 
 def test_parser_lit_tous_les_items():
-    assert len(items_humanite()) == 20
+    assert len(items_humanite()) == 9999
 
 
 def test_parser_extrait_les_champs_attendus():
