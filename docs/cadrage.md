@@ -90,39 +90,52 @@ Dans le cadre du cadrage de La Gazette, nous avons évalué deux options pour ch
 
 ```mermaid
 graph TD
-    subgraph 1. Collecte
-        A[Presse PQR/PQN] -->|Flux RSS| B(Airflow : Ingestion Python)
-    end
+    %% Entités Externes
+    Internet((Internet / Utilisateurs))
+    Presse[Presse PQR/PQN]
+    InfraCode[Terraform / CI-CD]
 
-    subgraph 2. Stockage Brut
-        B -->|JSON/XML immuable| C[(MinIO / Object Storage - Zone Bronze)]
-    end
+    Internet -->|Requêtes HTTPS :443| Proxy
+    Presse -->|Flux RSS| B
+    InfraCode -.->|Provisionne le serveur et les conteneurs| VPS
 
-    subgraph 3. Nettoyage & Qualité
-        C --> D(Airflow : Script Transformation)
-        D -->|Dédoublonnage / Filtres| E[(PostgreSQL - Zone Silver)]
-    end
+    subgraph VPS [VPS - Hébergement Cloud]
+        Proxy[Reverse Proxy HTTPS<br>Nginx / Traefik]
 
-    subgraph 4. Regroupement par Thèmes
-        E --> F(Airflow : Modèle BERTopic)
-        F -->|Embeddings & Clusters| G[(PostgreSQL - Zone Gold)]
-    end
+        subgraph 1. Collecte
+            B(Airflow : Ingestion Python)
+        end
 
-    subgraph 5. Livraison
-        G --> H(Airflow : Génération Édition 7H)
-        H -->|Export JSON/Markdown| I[Publication / Archivage]
-    end
+        subgraph 2. Stockage Brut
+            B -->|JSON/XML immuable| C[(MinIO / Object Storage - Zone Bronze)]
+        end
 
-    subgraph 6. Supervision & Infrastructure
-        B -.-> J[Prometheus]
-        D -.-> J
-        F -.-> J
-        H -.-> J
-        J --> K[Grafana - Dashboards & Alertes]
-      
-        L[Terraform] -.->|Provisionne| B
-        L -.->|Provisionne| C
-        L -.->|Provisionne| E
-        L -.->|Provisionne| J
+        subgraph 3. Nettoyage & Qualité
+            C --> D(Airflow : Script Transformation)
+            D -->|Dédoublonnage / Filtres| E[(PostgreSQL - Zone Silver)]
+        end
+
+        subgraph 4. Regroupement par Thèmes
+            E --> F(Airflow : Modèle BERTopic)
+            F -->|Embeddings & Clusters| G[(PostgreSQL - Zone Gold)]
+        end
+
+        subgraph 5. Livraison
+            G --> H(Airflow : Génération Édition 7H)
+            H -->|Export JSON/Markdown| I[Serveur Web local<br>Publication / Archivage]
+        end
+
+        subgraph 6. Supervision & Alertes
+            B -.-> J[Prometheus]
+            D -.-> J
+            F -.-> J
+            H -.-> J
+            J --> K[Grafana - Dashboards]
+        end
+
+        %% Routage interne depuis le Reverse Proxy vers les services exposés
+        Proxy -->|/gazette| I
+        Proxy -->|/airflow| B
+        Proxy -->|/grafana| K
     end
 ```
