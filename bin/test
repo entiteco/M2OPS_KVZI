@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -e
+echo "🧹 Linting avec Ruff..."
+docker compose run --rm airflow-scheduler ruff check src/ tests/
+echo "🧪 Lancement des tests..."
+docker compose run --rm airflow-scheduler pytest tests/

@@ -1,0 +1,54 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Configuration Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Installation dépendances pour tests locaux
+        run: |
+          pip install -r requirements.txt
+
+      - name: Lint avec Ruff
+        run: ruff check src/ tests/
+
+      - name: Tests unitaires avec Pytest
+        run: pytest tests/
+
+      - name: Connexion à GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Génération du Tag Horodaté (YYYYMMDDHHMMSS-sha)
+        id: generate_tag
+        run: |
+          TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "TAG=${TIMESTAMP}-${SHORT_SHA}" >> $GITHUB_ENV
+
+      - name: Build et Push de l'image Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ghcr.io/${{ github.repository_owner }}/la-gazette:${{ env.TAG }}, ghcr.io/${{ github.repository_owner }}/la-gazette:latest

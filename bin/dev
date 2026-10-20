@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -e
+echo "🚀 Lancement de l'environnement de développement..."
+docker compose up --build -d
+echo "✅ Airflow dispo sur http://localhost:8080 (airflow/airflow)"
+echo "✅ MinIO dispo sur http://localhost:9001 (minioadmin/minioadmin)"

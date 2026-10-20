@@ -1,0 +1,5 @@
+apache-airflow==2.8.1
+feedparser==6.0.10
+requests==2.31.0
+pytest==8.0.0
+ruff==0.1.14
