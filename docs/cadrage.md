@@ -106,9 +106,21 @@ Dans le cadre du cadrage de La Gazette, nous avons évalué deux options pour ch
 
 ```mermaid
 graph TD
-    subgraph 1. Collecte
-        A[Presse PQR/PQN] -->|Flux RSS| B(Airflow : Ingestion Python)
-    end
+    %% Entités Externes
+    Internet((Internet / Utilisateurs))
+    Presse[Presse PQR/PQN]
+    InfraCode[Terraform / CI-CD]
+
+    Internet -->|Requêtes HTTPS :443| Proxy
+    Presse -->|Flux RSS, toutes les 30 min| B
+    InfraCode -.->|Provisionne le serveur et les conteneurs| VPS
+
+    subgraph VPS [VPS - Hébergement Cloud]
+        Proxy[Reverse Proxy HTTPS<br>Nginx / Traefik]
+
+        subgraph 1. Collecte
+            B(Airflow : Ingestion Python)
+        end
 
         subgraph 2. Stockage Brut
             B -->|JSON/XML immuable| C[(MinIO / Object Storage - Zone Bronze)]
@@ -141,9 +153,5 @@ graph TD
         Proxy -->|/gazette| I
         Proxy -->|/airflow| B
         Proxy -->|/grafana| K
-    end
-
-    subgraph OU[Où ça tourne]
-        M[Conteneurs Docker Compose : nos machines jusqu'au TD 4/6, puis VPS fourni]
     end
 ```
