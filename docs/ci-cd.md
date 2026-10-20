@@ -10,6 +10,8 @@ Notre intégration continue repose sur GitHub Actions. À chaque push ou Pull Re
 
 L'image est construite en deux étapes : la première compile les dépendances (avec `gcc`), la seconde ne garde que les paquets installés. L'image finale ne contient pas les outils de compilation.
 
-`main` est protégée sur GitHub : pas de push direct, une Pull Request avec une approbation et la CI `build-and-test` verte sont obligatoires pour merger. On a vérifié qu'un test cassé rend la CI rouge et bloque le merge.
+`main` est protégée sur GitHub : pas de push direct, une Pull Request et la CI `build-and-test` verte sont obligatoires pour merger. On a vérifié qu'un test cassé rend la CI rouge et bloque le merge.
+
+L'approbation d'un·e relecteur·rice n'est pas imposée par GitHub : on l'a retirée pour ne pas bloquer l'équipe quand personne n'est disponible. La CI reste le garde-fou obligatoire, la relecture se fait à la demande.
 
 Pas de déploiement automatique pour l'instant (prévu au TD 7).
