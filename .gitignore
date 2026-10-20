@@ -1,0 +1,22 @@
+# Environnements virtuels Python
+venv/
+.env/
+__pycache__/
+*.pyc
+
+# Variables d'environnement et secrets
+.env
+*.pem
+
+# Terraform (ne jamais commit le state local ou les plugins)
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# Données locales (fichiers bruts ou bases de test)
+data/
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
