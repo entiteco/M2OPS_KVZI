@@ -21,5 +21,5 @@ __pycache__/
 # macOS
 .DS_Store
 
-# Données produites par la collecte
-data/collecte/
+# Données locales (MinIO, sorties de la collecte)
+data/

@@ -1,6 +1,6 @@
-FROM apache/airflow:2.8.1-python3.10
+FROM apache/airflow:2.8.1-python3.10 AS build
 
-# L'image officielle Airflow utilise déjà l'utilisateur non-root 'airflow'
+# gcc sert uniquement à compiler les dépendances : il reste dans cette étape
 USER root
 RUN apt-get update \
   && apt-get install -y --no-install-recommends gcc \
@@ -9,7 +9,17 @@ RUN apt-get update \
 
 USER airflow
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN pip wheel --no-cache-dir -r /tmp/requirements.txt -w /tmp/wheels
+
+
+FROM apache/airflow:2.8.1-python3.10
+
+# L'image officielle Airflow utilise déjà l'utilisateur non-root 'airflow'
+USER airflow
+COPY requirements.txt /tmp/requirements.txt
+# Les wheels sont montés le temps de l'installation, pas copiés dans l'image
+RUN --mount=type=bind,from=build,source=/tmp/wheels,target=/tmp/wheels \
+  pip install --no-cache-dir --no-index --find-links=/tmp/wheels -r /tmp/requirements.txt
 
 # Copie du code source dans le dossier des DAGs
 COPY --chown=airflow:root src/ /opt/airflow/dags/src/
