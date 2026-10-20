@@ -38,4 +38,4 @@ Lit le flux RSS de L'Humanité et écrit les items dans `data/collecte/` (néces
 
 ## Contribuer
 
-Une branche par sujet, une Pull Request vers `main`, une relecture et une CI verte avant de merger. Les règles sont dans [CONTRIBUTING.md](CONTRIBUTING.md).
+Une branche par sujet, une Pull Request vers `main` et une CI verte avant de merger. Les règles sont dans [CONTRIBUTING.md](CONTRIBUTING.md).
