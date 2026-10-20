@@ -41,12 +41,12 @@ Mettre en œuvre un pipeline de données automatisé capable de lire quotidienne
 
 ### Rôles dans l'équipe
 
-| Membre | Partie portée | Compétences |
-|---|---|---|
-| Zuzanna GLINIAK | Collecte des flux, sources, ordonnancement (Airflow) | C7.1, C7.3 |
-| Valentin MASSONNIÈRE | Stockage Bronze/Silver, nettoyage et qualité | C7.3 |
-| Kévin HEUGAS | Regroupement par thèmes (BERTopic), MLOps | C7.4 |
-| Imen SOUIDI | Supervision (Prometheus/Grafana), infrastructure as code | C8.1, C8.2 |
+| Membre                | Partie portée                                           | Compétences |
+| --------------------- | -------------------------------------------------------- | ------------ |
+| Zuzanna GLINIAK       | Collecte des flux, sources, ordonnancement (Airflow)     | C7.1, C7.3   |
+| Valentin MASSONNIÈRE | Stockage Bronze/Silver, nettoyage et qualité            | C7.3         |
+| Kévin HEUGAS         | Regroupement par thèmes (BERTopic), MLOps               | C7.4         |
+| Imen SOUIDI           | Supervision (Prometheus/Grafana), infrastructure as code | C8.1, C8.2   |
 
 CI/CD (C7.2) et documentation : partagées, chacun sur sa partie. Responsable d'exploitation tournant chaque semaine à partir du TD 7.
 
@@ -89,7 +89,7 @@ Dans le cadre du cadrage de La Gazette, nous avons évalué deux options pour ch
 ### 2.5. Surveiller
 
 * **Notre choix : Stack Prometheus & Grafana**
-  * *Pourquoi ce choix :* C'est le standard incontournable de l'observabilité moderne. Prometheus "scrappe" nos métriques techniques (durée du pipeline, nombre d'articles ingérés) de manière très légère. Grafana nous permet de construire un tableau de bord visuel et de configurer des alertes automatisées (ex: alerte Slack si l'édition de 7h n'est pas prête).
+  * *Pourquoi ce choix :* C'est le standard incontournable et léger de l'observabilité moderne. Prometheus "scrappe" nos métriques techniques (durée du pipeline, nombre d'articles ingérés). Loki gère la centralisation de nos logs (erreurs d'exécution d'Airflow, logs des conteneurs) de manière beaucoup plus frugale que la stack ELK. Enfin, Grafana centralise l'ensemble pour construire des tableaux de bord visuels corrélant logs et métriques, et configurer des alertes automatisées (ex: alerte Slack si l'édition de 7h n'est pas prête).
 * **Alternative écartée : Stack ELK (Elasticsearch, Logstash, Kibana) ou logs bruts**
   * *Pourquoi on l'écarte :* La stack ELK, bien que très puissante pour la recherche textuelle dans les logs, est extrêmement gourmande en mémoire et en CPU (infrastructure lourde). Se contenter de simples logs sans métriques, à l'inverse, nous rendrait "aveugles" sur la santé globale du pipeline.
 
@@ -142,11 +142,18 @@ graph TD
         end
 
         subgraph 6. Supervision & Alertes
-            B -.-> J[Prometheus]
-            D -.-> J
-            F -.-> J
-            H -.-> J
-            J --> K[Grafana - Dashboards]
+            B -.->|Métriques| J[Prometheus]
+            D -.->|Métriques| J
+            F -.->|Métriques| J
+            H -.->|Métriques| J
+          
+            B -.->|Logs| L[Loki]
+            D -.->|Logs| L
+            F -.->|Logs| L
+            H -.->|Logs| L
+          
+            J --> K[Grafana - Dashboards & Logs]
+            L --> K
         end
 
         %% Routage interne depuis le Reverse Proxy vers les services exposés

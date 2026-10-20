@@ -12,7 +12,7 @@ graph TD
     InfraCode[Terraform / CI-CD]
 
     Internet -->|Requêtes HTTPS :443| Proxy
-    Presse -->|Flux RSS| B
+    Presse -->|Flux RSS, toutes les 30 min| B
     InfraCode -.->|Provisionne le serveur et les conteneurs| VPS
 
     subgraph VPS [VPS - Hébergement Cloud]
@@ -42,11 +42,18 @@ graph TD
         end
 
         subgraph 6. Supervision & Alertes
-            B -.-> J[Prometheus]
-            D -.-> J
-            F -.-> J
-            H -.-> J
-            J --> K[Grafana - Dashboards]
+            B -.->|Métriques| J[Prometheus]
+            D -.->|Métriques| J
+            F -.->|Métriques| J
+            H -.->|Métriques| J
+          
+            B -.->|Logs| L[Loki]
+            D -.->|Logs| L
+            F -.->|Logs| L
+            H -.->|Logs| L
+          
+            J --> K[Grafana - Dashboards & Logs]
+            L --> K
         end
 
         %% Routage interne depuis le Reverse Proxy vers les services exposés
