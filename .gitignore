@@ -13,10 +13,6 @@ __pycache__/
 *.tfstate
 *.tfstate.backup
 
-# Données locales (fichiers bruts ou bases de test)
-data/
-*.sqlite3
-
 # IDE
 .vscode/
 .idea/
