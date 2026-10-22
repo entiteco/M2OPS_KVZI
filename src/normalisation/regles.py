@@ -10,23 +10,28 @@ from collections import defaultdict
 from src.normalisation.dates import est_dans_le_futur
 from src.normalisation.texte import cle_titre, reparer_mojibake
 
-RUBRIQUES_PUBLI = re.compile(r"publi|partenai|sponsor", re.IGNORECASE)
-RUBRIQUES_HORS_SUJET = re.compile(
-    r"horoscope|programme tv|jeux|concours", re.IGNORECASE
+# Marqueurs explicites : « publi » seul attrape « publique » (ministère public…).
+PUBLI = re.compile(
+    r"\bpubli-?reportages?\b|\bcontenus? partenaires?\b", re.IGNORECASE
+)
+HORS_SUJET = re.compile(
+    r"\bhoroscopes?\b|\bprogramme tv\b|\bjeux\b", re.IGNORECASE
 )
 # Une dépêche reprise à l'identique par ce nombre de sources ou plus est écartée.
 SEUIL_REPRISE = 6
-RESTE_ILLISIBLE = ("Ã", "Â", "�")
+MARQUES_ILLISIBLES = ("Ã", "Â", "�")
+
+
+def _texte_rubrique_titre(item: dict) -> str:
+    return f"{item.get('rubrique') or ''} {item.get('titre', '')}"
 
 
 def r01_publi(item: dict) -> bool:
-    return bool(item.get("rubrique") and RUBRIQUES_PUBLI.search(item["rubrique"]))
+    return bool(PUBLI.search(_texte_rubrique_titre(item)))
 
 
 def r02_rubrique_hors_sujet(item: dict) -> bool:
-    return bool(
-        item.get("rubrique") and RUBRIQUES_HORS_SUJET.search(item["rubrique"])
-    )
+    return bool(HORS_SUJET.search(_texte_rubrique_titre(item)))
 
 
 def r04_titre_vide(item: dict) -> bool:
@@ -38,21 +43,19 @@ def r05_date_future(item: dict) -> bool:
 
 
 def r06_encodage(item: dict) -> bool:
-    texte = item.get("titre", "") + " " + item.get("resume", "")
-    texte = reparer_mojibake(texte)
-    return any(marque in texte for marque in RESTE_ILLISIBLE)
+    texte = reparer_mojibake(item.get("titre", "") + " " + item.get("resume", ""))
+    return any(marque in texte for marque in MARQUES_ILLISIBLES)
 
 
 def r03_depeche_reprise(items: list[dict]) -> set[str]:
-    """Titres identiques repris par SEUIL_REPRISE sources ou plus : on ne garde rien."""
+    """Titres identiques repris par SEUIL_REPRISE sources ou plus : on écarte tout."""
     sources_par_titre = defaultdict(set)
     ids_par_titre = defaultdict(list)
     for item in items:
         cle = cle_titre(item.get("titre", ""))
-        if not cle:
-            continue
-        sources_par_titre[cle].add(item["source"])
-        ids_par_titre[cle].append(item["id"])
+        if cle:
+            sources_par_titre[cle].add(item["source"])
+            ids_par_titre[cle].append(item["id"])
     return {
         identifiant
         for cle, sources in sources_par_titre.items()
@@ -62,11 +65,8 @@ def r03_depeche_reprise(items: list[dict]) -> set[str]:
 
 
 def r07_doublon(items: list[dict]) -> set[str]:
-    """Même titre, à la casse et à la ponctuation près, dans une même source.
-
-    Le premier item est gardé, les suivants sont écartés."""
-    vus = set()
-    ecartes = set()
+    """Même titre dans une même source : le premier est gardé, les suivants écartés."""
+    vus, ecartes = set(), set()
     for item in items:
         cle = (item["source"], cle_titre(item.get("titre", "")))
         if not cle[1]:

@@ -57,6 +57,8 @@ Pour réveiller une source après correction : `UPDATE sources SET actif = true,
 ## Zone Silver : `articles_propres` et `rejets` (TD 4)
 
 Les items de la zone Bronze passent par la normalisation et les règles de `docs/qualite.md`.
+
+Stockage au TD 4 : pas de base SQL, les zones sont des buckets MinIO. `silver/articles_propres/<id>.json` pour chaque article gardé, `silver/rejets/<passage>.json` pour les rejets d'un passage, `rapports/qualite-YYYY-MM-DD.md` pour le rapport du jour.
 Chaque article propre garde la trace de son item brut : son `id` est celui de la zone Bronze, et sa `source` est celle du flux.
 
 ### `articles_propres`

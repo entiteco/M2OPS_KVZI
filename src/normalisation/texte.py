@@ -4,6 +4,7 @@ import re
 import unicodedata
 
 MARQUEURS_MOJIBAKE = ("Ã", "Â", "â€")
+_BALISES = re.compile(r"<[^>]+>")
 
 
 def reparer_mojibake(texte: str) -> str:
@@ -14,6 +15,10 @@ def reparer_mojibake(texte: str) -> str:
         return texte.encode("latin-1").decode("utf-8")
     except (UnicodeEncodeError, UnicodeDecodeError):
         return texte
+
+
+def retirer_balises(texte: str) -> str:
+    return _BALISES.sub("", texte)
 
 
 def normaliser_espaces(texte: str) -> str:
