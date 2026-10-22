@@ -43,6 +43,8 @@ Créée par une migration versionnée (Alembic, `src/stockage/migrations/`), app
 | `etag` | texte | Dernier `ETag` renvoyé par la source, renvoyé en `If-None-Match` |
 | `last_modified` | texte | Dernier `Last-Modified` renvoyé par la source, renvoyé en `If-Modified-Since` |
 
+Mise à jour à chaque passage du DAG `collecte_rss` (toutes les 30 min). Quand une source passe en sommeil, le passage échoue (rouge dans Airflow) pour qu'on le voie.
+
 Pour réveiller une source après correction : `UPDATE sources SET actif = true, echecs_consecutifs = 0 WHERE nom = '...';`
 
 ## Limites connues
