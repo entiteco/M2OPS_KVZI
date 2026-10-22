@@ -28,13 +28,13 @@ Services exposés :
 
 Lance le lint (ruff) puis les tests (pytest) dans le conteneur Airflow, comme la CI.
 
-## Collecter une source
+## Lancer une collecte à la main
 
 ```bash
-python -m src.collecte.rss
+docker compose exec airflow-scheduler bash -c "cd /opt/airflow/dags && python -m src.collecte.collecteur"
 ```
 
-Lit le flux RSS de L'Humanité et écrit les items dans `data/collecte/` (nécessite Python 3.10+ avec `feedparser` et `requests`).
+Passe sur toutes les sources actives de `docs/sources.csv` et écrit les nouveaux items dans MinIO (`bronze/articles_bruts/`, console sur http://localhost:9001). Le détail des données est dans [docs/donnees.md](docs/donnees.md).
 
 ## Contribuer
 

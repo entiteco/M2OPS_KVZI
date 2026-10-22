@@ -49,4 +49,5 @@ Pour réveiller une source après correction : `UPDATE sources SET actif = true,
 
 - **Ouest-France** ne garde que 10 items dans son flux (~30 min d'actualité pour ~20 articles/h). Avec une collecte toutes les 30 min, une partie des articles est perdue. On garde la source (premier quotidien régional) et on accepte la perte : la gazette cherche les thèmes du jour, pas l'exhaustivité.
 - **Le Progrès et DNA** (même groupe) publient les mêmes articles nationaux sous des liens différents : ce ne sont pas des doublons au sens de `(source, lien)`. Le dédoublonnage entre sources relève du nettoyage (TD 4).
-- **Les Échos, Le Télégramme, Sud Ouest, La Voix du Nord** répondent 403 à un client automatique (cf. `docs/sources.csv`). Elles restent dans la table et passent en sommeil après 3 échecs : on ne contourne pas leur refus.
+- **Les Échos (2 flux), Le Télégramme, La Voix du Nord** répondent 403 à un client automatique (cf. `docs/sources.csv`). Elles restent dans la table et passent en sommeil après 3 échecs : on ne contourne pas leur refus.
+- **Sud Ouest** passe par une protection anti-robots (Imperva) qui accepte aujourd'hui le collecteur : si elle se met à refuser, la source s'endormira comme les autres.
