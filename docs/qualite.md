@@ -18,7 +18,7 @@ Les seuils sont écrits ici, pas seulement dans le code : si un seuil change, ce
 ## Ordre d'application (`src/normalisation/passage.py`)
 
 1. Correction de l'encodage et normalisation des espaces (`texte.py`), avant toute règle.
-2. Règles à un item : R01, R02, R04, R05, R06.
+2. Règles à un item, dans cet ordre : R04, R05, R06, R01, R02. Le premier qui écarte l'item donne son nom dans `rejets`.
 3. Règles de lot : R03 (sur tout le passage), puis R07 (dans chaque source).
 
 Un item écarté par une règle n'est pas examiné par les suivantes : il n'apparaît qu'une fois dans `rejets`.
@@ -37,3 +37,4 @@ Un item écarté par une règle n'est pas examiné par les suivantes : il n'appa
 |---|---|---|
 | 2026-10-22 | Création des règles R01 à R07 | Premier passage du TD 4 |
 | 2026-10-22 | R01 et R02 resserrées (marqueurs explicites, « concours » retiré) | Sur 379 articles, « publi » attrapait « publique » (38 faux positifs) et « concours » de l'actualité locale |
+| 2026-10-22 | Ordre d'application aligné sur le code (R04, R05, R06, R01, R02) | La doc ne reflétait pas l'ordre réel de `regle_item` |
