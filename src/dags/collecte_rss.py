@@ -1,5 +1,7 @@
 """DAG Airflow : la collecte de toutes les sources, toutes les 30 minutes."""
 
+import json
+import logging
 import os
 from datetime import timedelta
 
@@ -46,7 +48,26 @@ def collecte_rss():
             )
         return compteurs
 
-    collecter()
+    @task(trigger_rule="all_done", execution_timeout=timedelta(minutes=10))
+    def controler_qualite() -> dict:
+        """Passage de nettoyage après la collecte. Tourne même si la collecte a échoué :
+        les sources saines doivent quand même être nettoyées."""
+        from src.normalisation.passage import executer
+        from src.stockage.bronze import client_minio
+
+        bilan = executer(client_minio())
+        logging.getLogger("qualite").info(json.dumps({"passage": bilan}, ensure_ascii=False))
+        if bilan["alertes"]:
+            raise AirflowException(
+                "Taux de rejet supérieur à 80 % : " + ", ".join(bilan["alertes"])
+            )
+        return bilan
+
+    collecte = collecter()
+    controle = controler_qualite()
+    collecte >> controle
 
 
 collecte_rss()
+
+

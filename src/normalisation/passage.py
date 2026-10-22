@@ -21,6 +21,8 @@ from src.normalisation.texte import (
 BUCKET_BRONZE = "bronze"
 BUCKET_SILVER = "silver"
 BUCKET_RAPPORTS = "rapports"
+# Au-delà de ce taux de rejet, une source déclenche une alerte (docs/qualite.md).
+SEUIL_ALERTE_REJET = 0.80
 
 
 def normaliser(item: dict) -> dict:
@@ -126,7 +128,25 @@ def executer(client, passage: str | None = None) -> dict:
         texte.encode("utf-8"),
         "text/markdown",
     )
-    return {"entres": len(bruts), "gardes": len(gardes), "rejetes": len(rejets)}
+    taux = taux_rejet_par_source(bruts, rejets)
+    return {
+        "passage": passage,
+        "entres": len(bruts),
+        "gardes": len(gardes),
+        "rejetes": len(rejets),
+        "taux_rejet": {s: round(t, 3) for s, t in taux.items()},
+        "alertes": sources_en_alerte(taux),
+    }
+
+
+def taux_rejet_par_source(entres: list[dict], rejets: list[dict]) -> dict[str, float]:
+    total = Counter(i["source"] for i in entres)
+    rejetes = Counter(r["source"] for r in rejets)
+    return {source: rejetes[source] / n for source, n in total.items() if n}
+
+
+def sources_en_alerte(taux: dict[str, float]) -> list[str]:
+    return sorted(s for s, t in taux.items() if t > SEUIL_ALERTE_REJET)
 
 
 def rapport(entres: int, gardes: list, rejets: list, date: str) -> str:

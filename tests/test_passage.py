@@ -75,3 +75,15 @@ def test_rapport_compte_par_regle_et_par_source():
     assert "| R01_publi | 2 |" in texte
     assert "| A | R01_publi | 2 |" in texte
     assert "1. R01_publi (2)" in texte
+
+
+def test_taux_rejet_par_source_et_alerte():
+    from src.normalisation.passage import sources_en_alerte, taux_rejet_par_source
+
+    entres = [brut(id=str(i), source="A") for i in range(5)] + [brut(id="b", source="B")]
+    rejets = [{"id": str(i), "source": "A", "regle": "R04_titre_vide"} for i in range(4)]
+    taux = taux_rejet_par_source(entres, rejets)
+    assert taux == {"A": 0.8, "B": 0.0}
+    assert sources_en_alerte(taux) == []
+    rejets.append({"id": "4", "source": "A", "regle": "R04_titre_vide"})
+    assert sources_en_alerte(taux_rejet_par_source(entres, rejets)) == ["A"]
