@@ -53,3 +53,41 @@ Pour réveiller une source après correction : `UPDATE sources SET actif = true,
 - **Le Progrès et DNA** (même groupe) publient les mêmes articles nationaux sous des liens différents : ce ne sont pas des doublons au sens de `(source, lien)`. Le dédoublonnage entre sources relève du nettoyage (TD 4).
 - **Les Échos (2 flux), Le Télégramme, La Voix du Nord** répondent 403 à un client automatique (cf. `docs/sources.csv`). Elles restent dans la table et passent en sommeil après 3 échecs : on ne contourne pas leur refus.
 - **Sud Ouest** passe par une protection anti-robots (Imperva) qui accepte aujourd'hui le collecteur : si elle se met à refuser, la source s'endormira comme les autres.
+
+## Zone Silver : `articles_propres` et `rejets` (TD 4)
+
+Les items de la zone Bronze passent par la normalisation et les règles de `docs/qualite.md`.
+Chaque article propre garde la trace de son item brut : son `id` est celui de la zone Bronze, et sa `source` est celle du flux.
+
+### `articles_propres`
+
+| Champ | Type | Description |
+|---|---|---|
+| `id` | texte (16 car.) | Identifiant de l'item brut (même valeur qu'en Bronze) |
+| `source` | texte | Nom de la source |
+| `lien` | texte (URL) | Lien vers l'article chez l'éditeur |
+| `titre` | texte | Titre corrigé (encodage réparé, espaces normalisés) |
+| `extrait` | texte | Extrait borné à 300 caractères, coupé sur un mot |
+| `publie_le` | date ISO 8601 UTC ou `null` | Date de publication |
+| `recupere_le` | date ISO 8601 UTC | Moment de la collecte |
+| `rubrique` | texte ou `null` | Première catégorie du flux |
+| `passage` | texte | Identifiant du passage de normalisation qui a produit la ligne |
+
+### `rejets`
+
+| Champ | Type | Description |
+|---|---|---|
+| `id` | texte | Identifiant de l'item brut rejeté |
+| `source` | texte | Nom de la source |
+| `regle` | texte | Identifiant de la règle (`R01_publi`, …) |
+| `passage` | texte | Identifiant du passage |
+| `rejete_le` | date ISO 8601 UTC | Moment du rejet |
+
+### Rétention
+
+- Zone Bronze : conservée tant que la source est active. Elle sert de preuve pour toute ligne propre.
+- `articles_propres` : garder 90 jours glissants. Au-delà, la ligne est supprimée, son item brut reste disponible.
+- `rejets` : garder 30 jours glissants, puis supprimer. Le rapport quotidien archivé reste la trace durable des rejets.
+- Les rapports `rapports/qualite-YYYY-MM-DD.md` sont conservés sans limite, et ne contiennent aucune donnée personnelle.
+
+Ce qu'on ne stocke pas, à aucune étape : le texte intégral, les images, les commentaires, les auteurs.
