@@ -1,31 +1,29 @@
-"""Collecte d'un flux RSS : lecture, parsing, écriture des items en JSON.
+"""Lecture d'un flux RSS / Atom : transforme les entrées en items bruts.
+
+feedparser gère les variantes RSS 2.0 / Atom (pubDate / updated,
+description / summary, guid / id), les formats de date et les encodages.
 """
 
-import argparse
 import html
-import json
-import os
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 
 import feedparser
-import requests
 
-USER_AGENT = "LaGazette/0.1 (projet etudiant M2 Efrei; collecte RSS)"
-TIMEOUT_SECONDES = 10
-DOSSIER_SORTIE = os.environ.get("COLLECTE_OUTPUT_DIR", "data/collecte")
+from src.stockage.bronze import identifiant
 
 _BALISES_HTML = re.compile(r"<[^>]+>")
 
-
-def telecharger(url: str) -> bytes:
-    """Récupère le contenu brut du flux ; lève une exception si HTTP != 2xx."""
-    reponse = requests.get(
-        url, headers={"User-Agent": USER_AGENT}, timeout=TIMEOUT_SECONDES
-    )
-    reponse.raise_for_status()
-    return reponse.content
+# Retirés du payload : texte intégral, images, commentaires, auteurs.
+_CHAMPS_EXCLUS = {
+    "content",
+    "author",
+    "authors",
+    "author_detail",
+    "comments",
+    "wfw_commentrss",
+    "slash_comments",
+}
 
 
 def _nettoyer_texte(texte: str) -> str:
@@ -41,64 +39,48 @@ def _date_iso(entree) -> str | None:
     return datetime(*date[:6], tzinfo=timezone.utc).isoformat()
 
 
-def parser(contenu: bytes, source: str) -> list[dict]:
-    """Transforme un flux RSS/Atom en liste d'items."""
+def _payload(entree) -> dict:
+    payload = {
+        cle: valeur
+        for cle, valeur in entree.items()
+        if cle not in _CHAMPS_EXCLUS
+        and not cle.startswith("media_")
+        and not cle.endswith("_parsed")  # doublons non sérialisables des dates
+    }
+    if "links" in payload:
+        # les « enclosures » sont les images jointes
+        payload["links"] = [
+            lien for lien in payload["links"] if lien.get("rel") != "enclosure"
+        ]
+    return payload
+
+
+def parser(contenu: bytes, source: str, recupere_le: str | None = None) -> list[dict]:
+    """Transforme un flux RSS/Atom en liste d'items au format articles_bruts.
+
+    Lève ValueError si le contenu n'est pas un flux lisible."""
     flux = feedparser.parse(contenu)
+    if flux.bozo and not flux.entries:
+        raise ValueError(f"flux illisible : {flux.get('bozo_exception')}")
+    recupere_le = recupere_le or datetime.now(timezone.utc).isoformat()
     items = []
     for entree in flux.entries:
         lien = entree.get("link")
         titre = entree.get("title")
         if not lien or not titre:
             continue
+        tags = entree.get("tags") or []
         items.append(
             {
+                "id": identifiant(source, lien),
                 "source": source,
-                "guid": entree.get("id") or lien,
-                "titre": _nettoyer_texte(titre),
-                "extrait": _nettoyer_texte(entree.get("summary", "")),
                 "lien": lien,
-                "date_publication": _date_iso(entree),
+                "titre": _nettoyer_texte(titre),
+                "resume": _nettoyer_texte(entree.get("summary", "")),
+                "publie_le": _date_iso(entree),
+                "recupere_le": recupere_le,
+                "rubrique": tags[0].get("term") if tags else None,
+                "payload": _payload(entree),
             }
         )
     return items
-
-
-def ecrire_json(
-    items: list[dict], source: str, url: str, dossier: str | Path = DOSSIER_SORTIE
-) -> Path:
-    """Écrit les items dans <dossier>/<source>_<horodatage UTC>.json."""
-    maintenant = datetime.now(timezone.utc)
-    dossier = Path(dossier)
-    dossier.mkdir(parents=True, exist_ok=True)
-    chemin = dossier / f"{source}_{maintenant:%Y%m%dT%H%M%SZ}.json"
-    document = {
-        "source": source,
-        "url": url,
-        "collecte_le": maintenant.isoformat(),
-        "nb_items": len(items),
-        "items": items,
-    }
-    chemin.write_text(
-        json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    return chemin
-
-
-def collecter(source: str, url: str, dossier: str | Path = DOSSIER_SORTIE) -> Path:
-    """Lit une source de bout en bout et renvoie le chemin du JSON produit."""
-    items = parser(telecharger(url), source)
-    return ecrire_json(items, source, url, dossier)
-
-
-def main() -> None:
-    arguments = argparse.ArgumentParser(description="Collecte d'un flux RSS")
-    arguments.add_argument("--source", default="humanite")
-    arguments.add_argument("--url", default="https://www.humanite.fr/feed")
-    arguments.add_argument("--dossier", default=DOSSIER_SORTIE)
-    args = arguments.parse_args()
-    chemin = collecter(args.source, args.url, args.dossier)
-    print(f"Items écrits dans {chemin}")
-
-
-if __name__ == "__main__":
-    main()
