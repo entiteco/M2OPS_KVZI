@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -e
-# On remplace l'entrypoint Airflow (qui transformerait "ruff" en "airflow ruff")
-# et on n'a pas besoin de Postgres pour les tests.
+# On remplace l'entrypoint Airflow (qui transformerait "ruff" en "airflow ruff").
+# Postgres démarre avec, pour les tests de la table sources (base gazette_test).
 # Dans le conteneur, le code est monté dans dags/src.
-docker compose run --rm --no-deps --entrypoint bash airflow-scheduler -c '
+docker compose run --rm --entrypoint bash airflow-scheduler -c '
   echo "🧹 Linting avec Ruff..."
   ruff check dags/src tests
   echo "🧪 Lancement des tests..."

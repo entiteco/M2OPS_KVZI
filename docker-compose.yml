@@ -5,9 +5,17 @@ x-airflow-common: &airflow-common
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
     AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
     AIRFLOW__WEBSERVER__SECRET_KEY: 'cle_secrete_super_securisee_gazette'
+    GAZETTE_DB_URL: postgresql://gazette:gazette@postgres:5432/gazette
+    GAZETTE_TEST_DB_URL: postgresql://gazette:gazette@postgres:5432/gazette_test
+    MINIO_ENDPOINT: minio:9000
+    MINIO_ACCESS_KEY: minioadmin
+    MINIO_SECRET_KEY: minioadmin
+    BRONZE_BUCKET: bronze
+    SOURCES_CSV: /opt/airflow/sources.csv
   volumes:
     - ./src:/opt/airflow/dags/src
     - ./tests:/opt/airflow/tests
+    - ./docs/sources.csv:/opt/airflow/sources.csv:ro
   depends_on:
     postgres:
       condition: service_healthy
@@ -21,6 +29,10 @@ services:
       POSTGRES_DB: airflow
     ports:
       - "5432:5432"
+    volumes:
+      # Sans volume, la base (et la table sources) serait effacée à chaque down
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
@@ -41,7 +53,8 @@ services:
   airflow-init:
     <<: *airflow-common
     command: >
-      bash -c "airflow db migrate && 
+      bash -c "airflow db migrate &&
+      (cd /opt/airflow/dags && python -m src.stockage.migrer) &&
       airflow users create --role Admin --username airflow --password airflow --email admin@example.com --firstname Admin --lastname Admin || true"
 
   airflow-webserver:
@@ -59,3 +72,6 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+
+volumes:
+  postgres-data:
