@@ -28,6 +28,18 @@ Services exposés :
 
 Lance le lint (ruff) puis les tests (pytest) dans le conteneur Airflow, comme la CI.
 
+## Collecte automatique
+
+Le DAG Airflow `collecte_rss` (`src/dags/collecte_rss.py`) collecte toutes les sources **toutes les 30 minutes**, dès `./bin/dev`, sans rien activer à la main. Il tourne tant que la machine et Docker restent allumés.
+
+- Suivi : http://localhost:8080, DAG `collecte_rss`. Le journal de la tâche contient une ligne JSON par source.
+- Un passage **rouge** signale qu'une source vient d'être mise en sommeil (3 échecs d'affilée).
+- Bilan (articles par source, sources en sommeil) :
+
+```bash
+docker compose exec airflow-scheduler bash -c "cd /opt/airflow/dags && python -m src.stockage.bilan"
+```
+
 ## Lancer une collecte à la main
 
 ```bash
