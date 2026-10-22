@@ -24,3 +24,4 @@ RUN --mount=type=bind,from=build,source=/tmp/wheels,target=/tmp/wheels \
 # Copie du code source dans le dossier des DAGs
 COPY --chown=airflow:root src/ /opt/airflow/dags/src/
 COPY --chown=airflow:root tests/ /opt/airflow/tests/
+COPY --chown=airflow:root docs/sources.csv /opt/airflow/sources.csv

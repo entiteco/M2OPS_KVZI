@@ -13,6 +13,24 @@ jobs:
       contents: read
       packages: write
 
+    # Base jetable pour les tests de la table sources
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: gazette
+          POSTGRES_PASSWORD: gazette
+          POSTGRES_DB: gazette_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gazette"
+          --health-interval 5s
+          --health-retries 5
+
+    env:
+      GAZETTE_TEST_DB_URL: postgresql://gazette:gazette@localhost:5432/gazette_test
+
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
