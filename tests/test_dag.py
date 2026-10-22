@@ -11,7 +11,8 @@ def test_dag_collecte_se_charge_et_tourne_toutes_les_30_min():
     dagbag = DagBag(dag_folder=str(DOSSIER_DAGS), include_examples=False)
     assert dagbag.import_errors == {}
 
-    dag = dagbag.get_dag("collecte_rss")
+    # dagbag.dags plutôt que get_dag() : pas besoin de la base d'Airflow (absente en CI)
+    dag = dagbag.dags["collecte_rss"]
     assert dag.schedule_interval == "*/30 * * * *"
     assert dag.catchup is False
     assert dag.max_active_runs == 1
