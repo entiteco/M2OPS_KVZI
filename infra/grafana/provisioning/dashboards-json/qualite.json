@@ -1,0 +1,110 @@
+{
+  "uid": "gazette-qualite",
+  "title": "La gazette : qualité du passage",
+  "tags": [
+    "m2ops",
+    "qualite"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Taux de rejet par source (par passage)",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "gazette"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT mesure_le AS time, taux_rejet AS value, source AS metric FROM metriques_passage WHERE $__timeFilter(mesure_le) ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Entrés, gardés et rejetés (tous passages)",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "gazette"
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT mesure_le AS time, SUM(entres) AS entrés, SUM(gardes) AS gardés, SUM(rejetes) AS rejetés FROM metriques_passage WHERE $__timeFilter(mesure_le) GROUP BY mesure_le ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Rejets par source (dernier passage)",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "gazette"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT source, entres, gardes, rejetes, round(taux_rejet::numeric, 3) AS taux_rejet, mesure_le FROM metriques_passage WHERE passage = (SELECT passage FROM metriques_passage ORDER BY mesure_le DESC LIMIT 1) ORDER BY taux_rejet DESC"
+        }
+      ]
+    }
+  ]
+}

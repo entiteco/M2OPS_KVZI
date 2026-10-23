@@ -54,42 +54,48 @@ Pour réveiller une source après correction : `UPDATE sources SET actif = true,
 - **Les Échos (2 flux), Le Télégramme, La Voix du Nord** répondent 403 à un client automatique (cf. `docs/sources.csv`). Elles restent dans la table et passent en sommeil après 3 échecs : on ne contourne pas leur refus.
 - **Sud Ouest** passe par une protection anti-robots (Imperva) qui accepte aujourd'hui le collecteur : si elle se met à refuser, la source s'endormira comme les autres.
 
-## Zone Silver : `articles_propres` et `rejets` (TD 4)
+## Zone Silver : `articles_propres` (PostgreSQL, TD 4)
 
-Les items de la zone Bronze passent par la normalisation et les règles de `docs/qualite.md`.
+Les items de la zone Bronze passent par la normalisation et les règles de `docs/qualite.md`. Seuls les articles gardés entrent en Silver : **les rejets ne sont pas stockés en Silver**. Ils se lisent dans le rapport du jour (`rapports/qualite-YYYY-MM-DD.md`) et dans l'historique des métriques ci-dessous.
 
-Stockage au TD 4 : pas de base SQL, les zones sont des buckets MinIO. `silver/articles_propres/<id>.json` pour chaque article gardé, `silver/rejets/<passage>.json` pour les rejets d'un passage, `rapports/qualite-YYYY-MM-DD.md` pour le rapport du jour.
-Chaque article propre garde la trace de son item brut : son `id` est celui de la zone Bronze, et sa `source` est celle du flux.
+Chaque article propre garde la trace de son item brut : son `id` est celui de la zone Bronze, et sa `source` est celle du flux. L'écriture est un upsert sur `id` : relancer un passage ne crée pas de doublon.
 
 ### `articles_propres`
 
 | Champ | Type | Description |
 |---|---|---|
-| `id` | texte (16 car.) | Identifiant de l'item brut (même valeur qu'en Bronze) |
+| `id` | texte (16 car.), clé primaire | Identifiant de l'item brut (même valeur qu'en Bronze) |
 | `source` | texte | Nom de la source |
 | `lien` | texte (URL) | Lien vers l'article chez l'éditeur |
 | `titre` | texte | Titre corrigé (encodage réparé, espaces normalisés) |
 | `extrait` | texte | Extrait borné à 300 caractères, coupé sur un mot |
-| `publie_le` | date ISO 8601 UTC ou `null` | Date de publication |
-| `recupere_le` | date ISO 8601 UTC | Moment de la collecte |
+| `publie_le` | horodatage ou `null` | Date de publication |
+| `recupere_le` | horodatage | Moment de la collecte |
 | `rubrique` | texte ou `null` | Première catégorie du flux |
 | `passage` | texte | Identifiant du passage de normalisation qui a produit la ligne |
 
-### `rejets`
+### `metriques_passage` (PostgreSQL, historique)
+
+Une ligne par passage et par source (clé `passage`, `source`). Sert à visualiser l'évolution des métriques dans Grafana.
 
 | Champ | Type | Description |
 |---|---|---|
-| `id` | texte | Identifiant de l'item brut rejeté |
+| `passage` | texte | Identifiant du passage (`YYYYMMDDTHHMMSSZ`) |
 | `source` | texte | Nom de la source |
-| `regle` | texte | Identifiant de la règle (`R01_publi`, …) |
-| `passage` | texte | Identifiant du passage |
-| `rejete_le` | date ISO 8601 UTC | Moment du rejet |
+| `entres` | entier | Items présents en Bronze pour cette source au moment du passage (le passage relit tout le stock du jour) |
+| `gardes` | entier | Articles gardés dans `articles_propres` |
+| `rejetes` | entier | Items rejetés par les règles, à ce passage |
+| `taux_rejet` | décimal entre 0 et 1 | `rejetes / entres` |
+| `mesure_le` | horodatage | Moment de la mesure |
+
+Le tableau de bord « La gazette : qualité du passage » est provisionné dans Grafana (http://localhost:3000, compte `admin` / `admin` en local).
 
 ### Rétention
 
 - Zone Bronze : conservée tant que la source est active. Elle sert de preuve pour toute ligne propre.
 - `articles_propres` : garder 90 jours glissants. Au-delà, la ligne est supprimée, son item brut reste disponible.
-- `rejets` : garder 30 jours glissants, puis supprimer. Le rapport quotidien archivé reste la trace durable des rejets.
+- `metriques_passage` : conservée sans limite, c'est l'historique.
+- Les rejets ne sont pas conservés en base. Le rapport quotidien archivé est la trace durable.
 - Les rapports `rapports/qualite-YYYY-MM-DD.md` sont conservés sans limite, et ne contiennent aucune donnée personnelle.
 
 Ce qu'on ne stocke pas, à aucune étape : le texte intégral, les images, les commentaires, les auteurs.

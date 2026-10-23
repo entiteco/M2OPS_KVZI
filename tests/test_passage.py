@@ -87,3 +87,19 @@ def test_taux_rejet_par_source_et_alerte():
     assert sources_en_alerte(taux) == []
     rejets.append({"id": "4", "source": "A", "regle": "R04_titre_vide"})
     assert sources_en_alerte(taux_rejet_par_source(entres, rejets)) == ["A"]
+
+
+def test_metriques_par_source_compte_entres_gardes_et_rejets():
+    from src.normalisation.passage import metriques_par_source
+
+    entres = [brut(id="1", source="A"), brut(id="2", source="A"), brut(id="3", source="B")]
+    gardes = [{"id": "2", "source": "A"}]
+    rejets = [
+        {"id": "1", "source": "A", "regle": "R04_titre_vide"},
+        {"id": "3", "source": "B", "regle": "R01_publi"},
+    ]
+    lignes = metriques_par_source(entres, gardes, rejets, "P1")
+    assert lignes == [
+        {"passage": "P1", "source": "A", "entres": 2, "gardes": 1, "rejetes": 1, "taux_rejet": 0.5},
+        {"passage": "P1", "source": "B", "entres": 1, "gardes": 0, "rejetes": 1, "taux_rejet": 1.0},
+    ]

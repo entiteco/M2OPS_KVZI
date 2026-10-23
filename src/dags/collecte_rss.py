@@ -53,9 +53,14 @@ def collecte_rss():
         """Passage de nettoyage après la collecte. Tourne même si la collecte a échoué :
         les sources saines doivent quand même être nettoyées."""
         from src.normalisation.passage import executer
+        from src.stockage import sources
         from src.stockage.bronze import client_minio
 
-        bilan = executer(client_minio())
+        conn = sources.connexion()
+        try:
+            bilan = executer(client_minio(), conn)
+        finally:
+            conn.close()
         logging.getLogger("qualite").info(json.dumps({"passage": bilan}, ensure_ascii=False))
         if bilan["alertes"]:
             raise AirflowException(

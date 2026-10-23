@@ -1,0 +1,14 @@
+# Source de données : la base gazette (tables articles_propres et metriques_passage).
+apiVersion: 1
+datasources:
+  - name: Gazette
+    type: postgres
+    uid: gazette
+    url: postgres:5432
+    user: gazette
+    secureJsonData:
+      password: gazette
+    jsonData:
+      database: gazette
+      sslmode: disable
+      postgresVersion: 1500

@@ -50,6 +50,20 @@ services:
     volumes:
       - ./data/bronze:/data
 
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      # Source de données PostgreSQL et tableau de bord « Qualité » provisionnés
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   airflow-init:
     <<: *airflow-common
     command: >

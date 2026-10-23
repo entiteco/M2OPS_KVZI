@@ -1,14 +1,18 @@
 """Passage de nettoyage : zone Bronze -> zone Silver (TD 4).
 
 Ordre : normalisation, règles à un item, règles de lot (R03 puis R07).
-Sortie : bucket `silver` (articles_propres/<id>.json, rejets/<passage>.json),
-rapport dans le bucket `rapports` (qualite-<date>.md).
+Sortie : table PostgreSQL `articles_propres` (gardés uniquement), table
+`metriques_passage` (historique par passage et par source), et le rapport
+du jour dans le bucket MinIO `rapports`. Les rejets ne sont pas stockés en
+Silver : ils se lisent dans le rapport et dans les métriques.
 """
 
 import io
 import json
 from collections import Counter
 from datetime import datetime, timezone
+
+import psycopg2.extras
 
 from src.normalisation import regles
 from src.normalisation.texte import (
@@ -19,8 +23,11 @@ from src.normalisation.texte import (
 )
 
 BUCKET_BRONZE = "bronze"
-BUCKET_SILVER = "silver"
 BUCKET_RAPPORTS = "rapports"
+COLONNES_ARTICLE = (
+    "id", "source", "lien", "titre", "extrait",
+    "publie_le", "recupere_le", "rubrique", "passage",
+)
 # Au-delà de ce taux de rejet, une source déclenche une alerte (docs/qualite.md).
 SEUIL_ALERTE_REJET = 0.80
 
@@ -81,6 +88,77 @@ def traiter(items_bruts: list[dict], passage: str) -> tuple[list[dict], list[dic
     return gardes, rejets
 
 
+def _ecrire(client, bucket: str, cle: str, contenu: bytes, type_contenu: str):
+    if not client.bucket_exists(bucket):
+        client.make_bucket(bucket)
+    client.put_object(
+        bucket, cle, io.BytesIO(contenu), length=len(contenu), content_type=type_contenu
+    )
+
+
+def ecrire_articles(conn, gardes: list[dict]) -> None:
+    """Upsert dans articles_propres : relancer un passage ne crée pas de doublon."""
+    lignes = [{c: g.get(c) for c in COLONNES_ARTICLE} for g in gardes]
+    with conn, conn.cursor() as cur:
+        psycopg2.extras.execute_batch(
+            cur,
+            """
+            INSERT INTO articles_propres
+                (id, source, lien, titre, extrait, publie_le, recupere_le, rubrique, passage)
+            VALUES
+                (%(id)s, %(source)s, %(lien)s, %(titre)s, %(extrait)s,
+                 %(publie_le)s, %(recupere_le)s, %(rubrique)s, %(passage)s)
+            ON CONFLICT (id) DO UPDATE
+            SET titre = EXCLUDED.titre,
+                extrait = EXCLUDED.extrait,
+                passage = EXCLUDED.passage
+            """,
+            lignes,
+        )
+
+
+def metriques_par_source(
+    entres: list[dict], gardes: list[dict], rejets: list[dict], passage: str
+) -> list[dict]:
+    """Une ligne par source : entrés, gardés, rejetés et taux de rejet du passage."""
+    total = Counter(i["source"] for i in entres)
+    gardes_par_source = Counter(g["source"] for g in gardes)
+    rejets_par_source = Counter(r["source"] for r in rejets)
+    return [
+        {
+            "passage": passage,
+            "source": source,
+            "entres": n,
+            "gardes": gardes_par_source[source],
+            "rejetes": rejets_par_source[source],
+            "taux_rejet": rejets_par_source[source] / n,
+        }
+        for source, n in sorted(total.items())
+        if n
+    ]
+
+
+def ecrire_metriques(conn, lignes: list[dict]) -> None:
+    """Upsert dans metriques_passage, clé (passage, source)."""
+    with conn, conn.cursor() as cur:
+        psycopg2.extras.execute_batch(
+            cur,
+            """
+            INSERT INTO metriques_passage
+                (passage, source, entres, gardes, rejetes, taux_rejet)
+            VALUES
+                (%(passage)s, %(source)s, %(entres)s, %(gardes)s, %(rejetes)s, %(taux_rejet)s)
+            ON CONFLICT (passage, source) DO UPDATE
+            SET entres = EXCLUDED.entres,
+                gardes = EXCLUDED.gardes,
+                rejetes = EXCLUDED.rejetes,
+                taux_rejet = EXCLUDED.taux_rejet,
+                mesure_le = now()
+            """,
+            lignes,
+        )
+
+
 def lire_bronze(client, bucket=BUCKET_BRONZE):
     for objet in client.list_objects(bucket, prefix="articles_bruts/", recursive=True):
         reponse = client.get_object(bucket, objet.object_name)
@@ -91,35 +169,16 @@ def lire_bronze(client, bucket=BUCKET_BRONZE):
             reponse.release_conn()
 
 
-def _ecrire(client, bucket: str, cle: str, contenu: bytes, type_contenu: str):
-    if not client.bucket_exists(bucket):
-        client.make_bucket(bucket)
-    client.put_object(
-        bucket, cle, io.BytesIO(contenu), length=len(contenu), content_type=type_contenu
-    )
-
-
-def executer(client, passage: str | None = None) -> dict:
-    """Un passage complet : lit Bronze, écrit Silver, rejets et rapport."""
+def executer(client, conn, passage: str | None = None) -> dict:
+    """Un passage complet : lit Bronze, écrit articles_propres et metriques_passage,
+    puis le rapport du jour dans MinIO."""
     maintenant = datetime.now(timezone.utc)
     passage = passage or maintenant.strftime("%Y%m%dT%H%M%SZ")
     bruts = list(lire_bronze(client))
     gardes, rejets = traiter(bruts, passage)
-    for item in gardes:
-        _ecrire(
-            client,
-            BUCKET_SILVER,
-            f"articles_propres/{item['id']}.json",
-            json.dumps(item, ensure_ascii=False, indent=2).encode("utf-8"),
-            "application/json",
-        )
-    _ecrire(
-        client,
-        BUCKET_SILVER,
-        f"rejets/{passage}.json",
-        json.dumps(rejets, ensure_ascii=False, indent=2).encode("utf-8"),
-        "application/json",
-    )
+    ecrire_articles(conn, gardes)
+    lignes = metriques_par_source(bruts, gardes, rejets, passage)
+    ecrire_metriques(conn, lignes)
     texte = rapport(len(bruts), gardes, rejets, maintenant.date().isoformat())
     _ecrire(
         client,
