@@ -1,0 +1,36 @@
+# Profil local/VM à tester avec 2 CPU et 4 Go ; aucun lancement au démarrage.
+x-light-env: &light-env
+  AIRFLOW__CORE__PARALLELISM: '1'
+  AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: '1'
+  AIRFLOW__SCHEDULER__PARSING_PROCESSES: '1'
+  AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: '60'
+  AIRFLOW__WEBSERVER__WORKERS: '1'
+  OMP_NUM_THREADS: '2'
+  NUMBA_NUM_THREADS: '2'
+  OPENBLAS_NUM_THREADS: '2'
+  MKL_NUM_THREADS: '2'
+
+services:
+  postgres:
+    mem_limit: 384m
+    cpus: 0.5
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=80"]
+  minio:
+    mem_limit: 384m
+    cpus: 0.5
+  grafana:
+    profiles: ["monitoring"]
+    mem_limit: 256m
+    cpus: 0.25
+  airflow-init:
+    environment: *light-env
+    mem_limit: 768m
+    cpus: 1
+  airflow-webserver:
+    environment: *light-env
+    mem_limit: 512m
+    cpus: 0.5
+  airflow-scheduler:
+    environment: *light-env
+    mem_limit: 2304m
+    cpus: 2

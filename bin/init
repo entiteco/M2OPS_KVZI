@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
+  echo "Docker avec le plugin Compose est requis pour initialiser les services." >&2
+  exit 1
+fi
+docker info >/dev/null
+test -f gazette.sql || { echo "Dump gazette.sql absent" >&2; exit 1; }
+test -f bronze-json.zip || { echo "Archive bronze-json.zip absente" >&2; exit 1; }
+
+# Le contexte Docker et les conteneurs applicatifs n'accèdent qu'au ZIP nécessaire.
+mkdir -p data/import
+cp bronze-json.zip data/import/bronze-json.zip
+# L'image MinIO utilise l'UID 1001 ; un bind mount créé par Docker appartient à root.
+docker compose run --rm --no-deps --user root --entrypoint chown minio 1001:1001 /data
+docker compose up -d --wait postgres minio
+
+# Restaurer uniquement sur une base vide pour préserver les données existantes.
+tables=$(docker compose exec -T postgres psql -U gazette -d gazette -Atc \
+  "SELECT count(*) FROM pg_tables WHERE schemaname = 'public'")
+if [[ "$tables" == "0" ]]; then
+  docker compose exec -T postgres psql -v ON_ERROR_STOP=1 --single-transaction \
+    -U gazette -d gazette < gazette.sql
+else
+  echo "Base gazette déjà initialisée : dump SQL ignoré, données conservées."
+fi
+
+# Restaurer avant le démarrage du scheduler évite une collecte concurrente.
+docker compose build airflow-init
+docker compose run --rm --no-deps airflow-init
+silver=$(docker compose exec -T postgres psql -U gazette -d gazette -Atc \
+  'SELECT count(*) FROM articles_propres')
+options=()
+if [[ "$silver" != "0" ]]; then
+  echo "Silver déjà présente ($silver articles) : conservation des données restaurées."
+  options+=(--bronze-seul)
+fi
+docker compose run --rm --no-deps -T --entrypoint bash airflow-scheduler -ec \
+  'cd /opt/airflow/dags && python -m src.stockage.restaurer --archive /opt/airflow/import/bronze-json.zip --minio "$@"' \
+  bash "${options[@]}"
+docker compose up -d
+echo "Initialisation terminée : Airflow http://localhost:8080, MinIO http://localhost:9001, Grafana http://localhost:3000"

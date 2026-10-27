@@ -1,0 +1,37 @@
+# Ces libellés aident uniquement à nommer les groupes découverts par BERTopic.
+# Ils ne sont pas des catégories imposées aux articles.
+- nom: Les mobilisations sociales et le maintien de l’ordre
+  description: Manifestations, syndicats, grèves, mouvements sociaux, police, sécurité des rassemblements, violences et contestation sociale.
+- nom: La vie politique et les institutions
+  description: Gouvernement, élections, présidence, parlement, partis politiques, démocratie, décisions publiques et institutions françaises.
+- nom: L’économie et les finances publiques
+  description: Budget, fiscalité, entreprises, industrie, emploi, économie, commerce, finances publiques, investissements et pouvoir d’achat.
+- nom: Les relations internationales et les conflits
+  description: Diplomatie, guerres, conflits internationaux, relations entre pays, Russie, Ukraine, États-Unis et politique étrangère.
+- nom: La santé et la protection sociale
+  description: Santé, médecine, hôpitaux, maladies, recherche médicale, patients, sécurité sociale et accès aux soins.
+- nom: Le sport et les compétitions
+  description: Actualité sportive, football, rugby, basket, handball, cyclisme, athlétisme, matchs, clubs et compétitions.
+  mots_cles: [sport, football, rugby, basket, handball, cyclisme, athlétisme, match, ligue, stade, championnat, compétition, tennis]
+- nom: La culture et les sorties
+  description: Culture, spectacles, festivals, musique, cinéma, musées, expositions, loisirs et sorties du week-end.
+- nom: La météo et les enjeux environnementaux
+  description: Météo, tempêtes, intempéries, climat, sécheresse, eau, écologie, biodiversité et protection de l’environnement.
+  mots_cles: [météo, tempête, intempéries, climat, sécheresse, eau, écologie, environnement, vigilance, vent, inondation]
+- nom: Les faits divers et les enquêtes
+  description: Faits divers, accidents, disparitions, décès, agressions, fusillades et enquêtes de police.
+- nom: Les accidents et les drames du quotidien
+  description: Accidents de la route, disparitions, décès accidentels, malaises, victimes, familles endeuillées et recherches de personnes.
+  mots_cles: [accident, disparition, décédé, décès, malaise, drame, victime]
+- nom: La justice et les droits
+  description: Justice, tribunaux, procès, condamnations, prison, droits fondamentaux, décisions judiciaires et recours.
+- nom: La vie locale et les services du quotidien
+  description: Vie quotidienne locale, communes, quartiers, urbanisme, logement, commerces, vie associative et services publics de proximité.
+- nom: Les sciences et les technologies
+  description: Sciences, technologies, numérique, intelligence artificielle, informatique, cybersécurité, internet et innovations.
+- nom: L’éducation et la jeunesse
+  description: Éducation, école, lycées, universités, étudiants, Parcoursup, orientation et vie des jeunes.
+- nom: Les transports et les déplacements
+  description: Transports, trains, déplacements, circulation, trafic ferroviaire, routes, mobilité et perturbations des voyages.
+- nom: Les livres et la vie littéraire
+  description: Littérature, romans, écrivains, livres, critiques littéraires, lecture, auteurs et édition.
