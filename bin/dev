@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
+cd "$(dirname "$0")/.."
+compose=(docker compose)
+if [[ "${1:-}" == "--light" ]]; then
+  compose+=(-f docker-compose.yml -f docker-compose.light.yml)
+  "${compose[@]}" stop grafana
+elif [[ $# -gt 0 ]]; then
+  echo "Usage : ./bin/dev [--light]" >&2
+  exit 1
+fi
 echo "🚀 Lancement de l'environnement de développement..."
-docker compose up --build -d
+"${compose[@]}" up --build -d
 echo "✅ Airflow dispo sur http://localhost:8080 (airflow/airflow)"
 echo "✅ MinIO dispo sur http://localhost:9001 (minioadmin/minioadmin)"

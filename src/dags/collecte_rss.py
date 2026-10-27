@@ -31,6 +31,8 @@ from airflow.exceptions import AirflowException
 def collecte_rss():
     @task(execution_timeout=timedelta(minutes=20))
     def collecter() -> dict:
+        from airflow.operators.python import get_current_context
+
         from src.collecte.collecteur import collecter_tout
         from src.stockage import sources
         from src.stockage.bronze import Bronze
@@ -41,6 +43,7 @@ def collecte_rss():
         finally:
             conn.close()
 
+        get_current_context()["ti"].xcom_push(key="bilan", value=compteurs)
         if compteurs["mises_en_sommeil"]:
             raise AirflowException(
                 "Sources mises en sommeil : "
@@ -52,6 +55,8 @@ def collecte_rss():
     def controler_qualite() -> dict:
         """Passage de nettoyage après la collecte. Tourne même si la collecte a échoué :
         les sources saines doivent quand même être nettoyées."""
+        from airflow.operators.python import get_current_context
+
         from src.normalisation.passage import executer
         from src.stockage import sources
         from src.stockage.bronze import client_minio
@@ -62,15 +67,47 @@ def collecte_rss():
         finally:
             conn.close()
         logging.getLogger("qualite").info(json.dumps({"passage": bilan}, ensure_ascii=False))
+        get_current_context()["ti"].xcom_push(key="bilan", value=bilan)
         if bilan["alertes"]:
             raise AirflowException(
                 "Taux de rejet supérieur à 80 % : " + ", ".join(bilan["alertes"])
             )
         return bilan
 
+    @task(execution_timeout=timedelta(minutes=20))
+    def produire_themes() -> dict:
+        from airflow.operators.python import get_current_context
+
+        from src.stockage import sources
+        from src.stockage.bronze import client_minio
+        from src.themes.passage import executer
+
+        contexte = get_current_context()
+        conn = sources.connexion()
+        try:
+            bilan = executer(
+                conn, client_minio(), reference=contexte["data_interval_end"],
+                declencheur=f"airflow:{contexte['run_id']}",
+            )
+        finally:
+            conn.close()
+        logging.getLogger("themes").info(json.dumps(bilan, ensure_ascii=False))
+        return bilan
+
+    @task(trigger_rule="all_done", execution_timeout=timedelta(minutes=2))
+    def notifier_bilan() -> dict:
+        from airflow.operators.python import get_current_context
+
+        from src.notifications.teams import notifier_contexte
+
+        return notifier_contexte(get_current_context())
+
     collecte = collecter()
     controle = controler_qualite()
-    collecte >> controle
+    themes = produire_themes()
+    collecte >> controle >> themes
+    notification = notifier_bilan()
+    [collecte, controle, themes] >> notification
 
 
 collecte_rss()

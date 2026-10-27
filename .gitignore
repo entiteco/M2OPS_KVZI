@@ -23,3 +23,9 @@ __pycache__/
 
 # Données locales (MinIO, sorties de la collecte)
 data/
+
+# Dumps de transfert et caches locaux
+/bronze-json.zip
+/gazette.sql
+.pytest_cache/
+.ruff_cache/

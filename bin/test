@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
+cd "$(dirname "$0")/.."
+compose=(docker compose)
+if [[ "${1:-}" == "--light" ]]; then
+  compose+=(-f docker-compose.yml -f docker-compose.light.yml)
+elif [[ $# -gt 0 ]]; then
+  echo "Usage : ./bin/test [--light]" >&2
+  exit 1
+fi
 # On remplace l'entrypoint Airflow (qui transformerait "ruff" en "airflow ruff").
 # Postgres démarre avec, pour les tests de la table sources (base gazette_test).
 # Dans le conteneur, le code est monté dans dags/src.
-docker compose run --rm --entrypoint bash airflow-scheduler -c '
+"${compose[@]}" run --rm --entrypoint bash airflow-scheduler -ec '
   echo "🧹 Linting avec Ruff..."
   ruff check dags/src tests
   echo "🧪 Lancement des tests..."

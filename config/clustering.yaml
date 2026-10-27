@@ -1,0 +1,41 @@
+fenetre_heures: 24
+# Grands thèmes du jour ; le nombre est un plafond, pas un quota à remplir.
+reduction: umap
+themes_cible: 10
+reduction_themes_ctfidf: false
+poids_lexical: 0.0
+reaffectation_seuil: 0.45
+embedding:
+  modele: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  revision: e8f8c211226b894fcb81acc59f3b34ba3efd5f42
+  batch_size: 32
+  max_seq_length: 128
+  threads: 2
+umap:
+  n_neighbors: 30
+  n_components: 5
+  min_dist: 0.0
+  metric: cosine
+  random_state: 42
+hdbscan:
+  min_cluster_size: 20
+  min_samples: 3
+  metric: euclidean
+  cluster_selection_method: eom
+representation:
+  language: multilingual
+  top_n_words: 8
+  ngram_range: [1, 2]
+  stop_words: mots_vides_fr.txt
+nommage:
+  libelles: libelles_themes.yaml
+  seuil_libelle: 0.25
+  poids_lexical_libelle: 0.4
+  tolerance_centralite: 0.06
+  poids_mots_cles: 0.10
+  longueur_cible: 110
+  penalite_longueur: 0.08
+silhouette:
+  sample_size: 2000
+  random_state: 42
+artefacts_bucket: mlops

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+cd "$(dirname "$0")/.."
+dossier="data/sauvegardes/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$dossier"
+touch "$dossier/INCOMPLET"
+docker compose exec -T postgres pg_dump -U gazette -Fc gazette > "$dossier/gazette.dump"
+docker compose exec -T postgres pg_dump -U airflow -Fc airflow > "$dossier/airflow.dump"
+docker compose exec -T airflow-scheduler bash -ec \
+  'cd /opt/airflow/dags && python -m src.stockage.sauvegarder' > "$dossier/minio.tar"
+(cd "$dossier" && sha256sum gazette.dump airflow.dump minio.tar > SHA256SUMS)
+rm "$dossier/INCOMPLET"
+echo "Sauvegarde terminée : $dossier"

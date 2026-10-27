@@ -58,6 +58,11 @@ Pour réveiller une source après correction : `UPDATE sources SET actif = true,
 
 Les items de la zone Bronze passent par la normalisation et les règles de `docs/qualite.md`. Seuls les articles gardés entrent en Silver : **les rejets ne sont pas stockés en Silver**. Ils se lisent dans le rapport du jour (`rapports/qualite-YYYY-MM-DD.md`) et dans l'historique des métriques ci-dessous.
 
+Le TD 5 lit cette table sur une fenêtre de publication de 24 heures, puis stocke
+le cache dans `embeddings`, les exécutions dans `runs`, les thèmes dans `themes`
+et les affectations dans `articles_themes`. Le contrat, les cas sans groupe et
+les artefacts reproductibles sont décrits dans [mlops.md](mlops.md).
+
 Chaque article propre garde la trace de son item brut : son `id` est celui de la zone Bronze, et sa `source` est celle du flux. L'écriture est un upsert sur `id` : relancer un passage ne crée pas de doublon.
 
 ### `articles_propres`
